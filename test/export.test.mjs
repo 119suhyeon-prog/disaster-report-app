@@ -1,0 +1,34 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import {parse} from 'kordoc';
+import JSZip from 'jszip';
+import {exportReport} from '../export.mjs';
+import {emptyReport,extractDraft,sample} from '../report.mjs';
+process.env.KORDOC_OFFLINE='1';
+const template=new URL('../templates/report.hwpx',import.meta.url);
+const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
+test('가상 사고를 원본 표에 반영하고 원본을 변경하지 않는다',async()=>{
+  const before=hash(await readFile(template));
+  const report=extractDraft(sample).report;
+  report.title='가상 사고 <긴급> & 확인';
+  report.timeline='14:10 신고 접수\n14:15 현장 도착';
+  const bytes=await exportReport(report);
+  const parsed=await parse(bytes,{keepLayoutTables:true});
+  assert.equal(parsed.success,true);
+  assert.match(parsed.markdown,/현재까지 인명피해 신고 없음/);
+  assert.match(parsed.markdown,/14:15 현장 도착/);
+  assert.doesNotMatch(parsed.markdown,/00담당부서|00:00|0\.0\./);
+  const zip=await JSZip.loadAsync(bytes);
+  const xml=await zip.file('Contents/section0.xml').async('string');
+  assert.doesNotMatch(xml,/<hp:linesegarray/);
+  assert.match(xml,/가상 사고 &lt;긴급&gt; &amp; 확인/);
+  assert.equal(hash(await readFile(template)),before);
+});
+test('내용이 없는 보고서도 0명 대신 확인 중으로 생성한다',async()=>{
+  const parsed=await parse(await exportReport(emptyReport()));
+  assert.equal(parsed.success,true);
+  assert.match(parsed.markdown,/인명피해: 확인 중/);
+  assert.doesNotMatch(parsed.markdown,/인명피해: 0/);
+});

@@ -1,0 +1,14 @@
+{
+  "name": "disaster-report-draft",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "jszip": "^3.10.2",
+    "kordoc": "4.24.12"
+  }
+}
