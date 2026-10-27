@@ -9,6 +9,12 @@ export const sections = [
   ['7. 향후 전망 및 대책', [['plan','향후 전망 및 대책']]],
 ];
 export const fields = sections.flatMap(([,items])=>items);
+export const requiredFields = ['occurredAt','location','overview','casualties'];
+export const missingRequired = report => fields.filter(([key])=>requiredFields.includes(key)&&!report[key]?.trim());
+export function requireComplete(report) {
+  const missing=missingRequired(report);
+  if(missing.length) throw Error(`필수 정보를 입력해 주세요: ${missing.map(([,label])=>label).join(', ')}`);
+}
 export const emptyReport = () => Object.fromEntries(fields.map(([key])=>[key,'']));
 export const sample = '2026년 10월 27일 14시 10분경 가상시 가상동 물류창고에서 화재 발생. 소방이 진화 중이며 사고원인은 확인 중. 현재까지 인명피해 신고 없음. 직원들은 대피했다고 하나 전원 대피 여부는 확인 중. 소방차 8대 출동. 시청 재난부서에 상황 전파 완료. 향후 추가 피해 여부를 확인할 예정.';
 export function validateReport(input) {

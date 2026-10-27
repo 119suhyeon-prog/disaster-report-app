@@ -2,10 +2,11 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { parse, patchHwpx } from 'kordoc';
 import JSZip from 'jszip';
-import { buildMarkdown, validateReport } from './report.mjs';
+import { buildMarkdown, validateReport, requireComplete } from './report.mjs';
 const templatePath=fileURLToPath(new URL('./templates/report.hwpx',import.meta.url));
 export async function exportReport(input) {
   const report=validateReport(input);
+  requireComplete(report);
   const original=await readFile(templatePath);
   const patched=await patchHwpx(original,buildMarkdown(report),{verify:true,structure:true});
   if(!patched.success||!patched.data||patched.skipped.length) throw Error('원본 서식에 일부 항목을 반영하지 못했습니다. 입력 길이와 서식을 확인해 주세요.');

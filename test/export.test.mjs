@@ -26,9 +26,13 @@ test('가상 사고를 원본 표에 반영하고 원본을 변경하지 않는�
   assert.match(xml,/가상 사고 &lt;긴급&gt; &amp; 확인/);
   assert.equal(hash(await readFile(template)),before);
 });
-test('내용이 없는 보고서도 0명 대신 확인 중으로 생성한다',async()=>{
-  const parsed=await parse(await exportReport(emptyReport()));
-  assert.equal(parsed.success,true);
-  assert.match(parsed.markdown,/인명피해: 확인 중/);
-  assert.doesNotMatch(parsed.markdown,/인명피해: 0/);
+test('필수 정보가 없는 보고서 다운로드를 서버에서도 거부한다',async()=>{
+  await assert.rejects(exportReport(emptyReport()),/필수 정보를 입력/);
+  const r=extractDraft(sample).report;r.location='   ';
+  await assert.rejects(exportReport(r),/장소/);
+});
+test('확인 중 상태를 명시하면 필수 입력으로 인정한다',async()=>{
+  const r=extractDraft(sample).report;r.casualties='확인 중';
+  const parsed=await parse(await exportReport(r));
+  assert.equal(parsed.success,true);assert.match(parsed.markdown,/인명피해: 확인 중/);
 });

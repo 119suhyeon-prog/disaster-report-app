@@ -1,7 +1,7 @@
 import http from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
-import {sections,fields,sample,extractDraft} from './report.mjs';
+import {sections,fields,sample,extractDraft,requiredFields} from './report.mjs';
 process.env.KORDOC_OFFLINE='1';
 const {exportReport}=await import('./export.mjs');
 const host=process.env.HOST||'127.0.0.1';
@@ -18,7 +18,7 @@ const server=http.createServer(async(req,res)=>{
   try {
     const path=new URL(req.url,`http://${req.headers.host}`).pathname;
     if(req.method==='GET'&&staticFiles[path]){const [name,type]=staticFiles[path];res.writeHead(200,{'Content-Type':type});res.end(await readFile(fileURLToPath(new URL(`./public/${name}`,import.meta.url))));return;}
-    if(req.method==='GET'&&path==='/api/schema'){json(res,200,{sections,fields,sample,mode:'rules-demo'});return;}
+    if(req.method==='GET'&&path==='/api/schema'){json(res,200,{sections,fields,sample,requiredFields,mode:'rules-demo'});return;}
     if(req.method!=='POST'){json(res,404,{error:'요청한 경로가 없습니다.'});return;}
     if(req.headers.origin&&req.headers.origin!==`http://${req.headers.host}`){json(res,403,{error:'허용되지 않은 요청입니다.'});return;}
     if(!req.headers['content-type']?.startsWith('application/json')){json(res,415,{error:'JSON 요청만 지원합니다.'});return;}
