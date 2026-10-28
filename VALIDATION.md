@@ -1,6 +1,6 @@
 # 검증 결과
 
-- `node --test test/*.test.mjs`: 24개 통과 (온AI 어댑터 기능 적용 후).
+- `node --test test/*.test.mjs`: 32개 통과 (OpenAI·Vercel 배포 구성 적용 후).
 - `node --check public/app.js`, `node --check server.mjs`: 통과.
 - HTTP `/api/schema`: 200 응답 확인.
 - 브라우저에서 가상 상황 불러오기 → 초안 반영 → 제목 직접 편집 → 추가 피해 입력 → 변경 후보 선택 → HWPX 다운로드 성공 메시지 확인.
@@ -26,3 +26,14 @@
 - 브라우저에서 **로컬 고정 응답 서버(실제 온AI 아님)**로 천장 낙하 예시를 처리하여 간결한 초안 표시, 자동 인명피해 확인 중의 필수 팝업, 사용자 확인, 입력 근거 표시, HWPX 다운로드 성공 확인.
 - 모의 결과 `artifacts/onai-mock-sample.hwpx`를 Kordoc으로 렌더링하여 1쪽의 항목 배치·겹침 없음 확인. 실제 한컴 프로그램 확인은 미실시.
 - 모의 검증 서버는 작업 후 종료. 기본 3210 앱은 연결 미설정 상태 유지.
+
+## 인터넷 테스트 배포 구성 (2026-10-28)
+
+- OpenAI Responses API 고정 엔드포인트·서버 키·strict JSON Schema·store:false 요청과 응답·거부·인증 오류·요청 제한·시간초과를 모의 검증.
+- Vercel Node.js 함수 진입점과 rewrite 파라미터, 파싱된 JSON body, HTTPS 출처·허용 도메인, API 접속 코드 보호 검증.
+- 배포 환경에서 접속 코드·공통 서명키 미설정 시 기동 거부. API 키와 접속 코드가 schema 응답에 포함되지 않는지 검증.
+- Vercel 진입점에서 실제 HWPX 파일 생성 테스트 통과.
+- Vercel 설치 명령과 동일한 `npm ci --omit=optional --ignore-scripts`로 별도 설치. 최소 의존성 약 48.5MB 및 HWPX 생성 확인.
+- 브라우저에서 접속 코드 입력 → OpenAI 키 미설정 상태 및 외부 전송 안내 표시 확인.
+- 실제 OpenAI API 키가 없어 유료 API 호출과 생성 품질은 미검증. 실제 Vercel 계정의 빌드·인터넷 배포·운영 제한도 미검증.
+- 로컬 기본 구성은 OpenAI 키 미설정 상태. Vercel 배포 전 VERCEL_DEPLOY.md의 환경변수 설정이 필요함.

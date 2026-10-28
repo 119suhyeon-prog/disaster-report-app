@@ -2,8 +2,10 @@ import http from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {existsSync} from 'node:fs';
+import {resolve} from 'node:path';
 import {createDraft,aiStatus} from './ai.mjs';
 import {issueEvidence,requireReviewed} from './review.mjs';
+import {deploymentConfig,validAccess} from './access.mjs';
 import {sections,fields,sample,extractDraft,requiredFields} from './report.mjs';
 process.env.KORDOC_OFFLINE='1';
 const envFile=fileURLToPath(new URL('./.env',import.meta.url));
@@ -12,22 +14,29 @@ process.env.KORDOC_OFFLINE='1';
 const {exportReport}=await import('./export.mjs');
 const host=process.env.HOST||'127.0.0.1';
 const port=Number(process.env.PORT||3210);
+const deployment=deploymentConfig();
 const staticFiles={'/':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript; charset=utf-8'],'/merge.js':['merge.js','text/javascript; charset=utf-8'],'/style.css':['style.css','text/css; charset=utf-8']};
 const json=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(data));};
-async function body(req){let total=0,chunks=[];for await(const chunk of req){total+=chunk.length;if(total>100000)throw Error('요청이 너무 큽니다.');chunks.push(chunk);}return JSON.parse(Buffer.concat(chunks).toString('utf8'));}
+async function body(req){
+  if(req.body!==undefined){const raw=typeof req.body==='string'?req.body:Buffer.isBuffer(req.body)?req.body.toString('utf8'):JSON.stringify(req.body);if(Buffer.byteLength(raw)>100000)throw Error('요청이 너무 큽니다.');return JSON.parse(raw);}
+  let total=0,chunks=[];for await(const chunk of req){total+=chunk.length;if(total>100000)throw Error('요청이 너무 큽니다.');chunks.push(chunk);}return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+}
 let exporting=false;
 let aiActive=0,requestTimes=[];
-const server=http.createServer(async(req,res)=>{
+export async function handler(req,res){
   res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Cache-Control','no-store');
   res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
-  const allowedHosts=new Set([`127.0.0.1:${port}`,`localhost:${port}`]);
-  if(!allowedHosts.has(req.headers.host)){json(res,403,{error:'로컬 주소로 접속해 주세요.'});return;}
+  const allowedHosts=new Set([`127.0.0.1:${port}`,`localhost:${port}`,...[...deployment.origins].map(x=>new URL(x).host)]);
+  if(!allowedHosts.has(req.headers.host)){json(res,403,{error:'허용된 앱 주소로 접속해 주세요.'});return;}
   try {
     const path=new URL(req.url,`http://${req.headers.host}`).pathname;
+    if(path==='/api/health'&&req.method==='GET'){json(res,200,{ok:true});return;}
+    if(path.startsWith('/api/')&&!validAccess(req.headers.authorization)){json(res,401,{code:'ACCESS_REQUIRED',error:'테스트 접속 코드를 입력해 주세요.'});return;}
     if(req.method==='GET'&&staticFiles[path]){const [name,type]=staticFiles[path];res.writeHead(200,{'Content-Type':type});res.end(await readFile(fileURLToPath(new URL(`./public/${name}`,import.meta.url))));return;}
     if(req.method==='GET'&&path==='/api/schema'){json(res,200,{sections,fields,sample,requiredFields,ai:aiStatus()});return;}
     if(req.method!=='POST'){json(res,404,{error:'요청한 경로가 없습니다.'});return;}
-    if(req.headers.origin&&req.headers.origin!==`http://${req.headers.host}`){json(res,403,{error:'허용되지 않은 요청입니다.'});return;}
+    const expectedOrigin=deployment.origins.has(`https://${req.headers.host}`)?`https://${req.headers.host}`:`http://${req.headers.host}`;
+    if(req.headers.origin&&req.headers.origin!==expectedOrigin){json(res,403,{error:'허용되지 않은 요청입니다.'});return;}
     if(!req.headers['content-type']?.startsWith('application/json')){json(res,415,{error:'JSON 요청만 지원합니다.'});return;}
     const data=await body(req);
     if(path==='/api/draft'){
@@ -44,7 +53,8 @@ const server=http.createServer(async(req,res)=>{
     }
     json(res,404,{error:'요청한 경로가 없습니다.'});
   }catch(error){json(res,error.code==='NOT_CONFIGURED'?503:400,{code:error.code||'INVALID_INPUT',error:error instanceof SyntaxError?'입력 형식을 확인해 주세요.':error.message||'처리 중 오류가 발생했습니다.'});}
-});
+}
+const server=http.createServer(handler);
 server.requestTimeout=150000;
-server.listen(port,host,()=>console.log(`상황이음 로컬 시제품: http://127.0.0.1:${port}\n${aiStatus().label} · 종료: Ctrl+C`));
+if(!process.env.VERCEL&&process.argv[1]&&fileURLToPath(import.meta.url)===resolve(process.argv[1]))server.listen(port,host,()=>console.log(`상황이음: http://127.0.0.1:${port}\n${aiStatus().label} · 종료: Ctrl+C`));
 server.on('error',error=>{console.error(error.code==='EADDRINUSE'?`${port} 포트가 사용 중입니다. 기존 실행 창을 확인해 주세요.`:error.message);process.exitCode=1;});

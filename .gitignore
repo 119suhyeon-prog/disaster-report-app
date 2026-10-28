@@ -5,3 +5,4 @@ artifacts/
 .env.*
 !.env.example
 *.local.mjs
+.vercel/

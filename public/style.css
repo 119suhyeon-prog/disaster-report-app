@@ -2,3 +2,5 @@
 .required-dialog{border:0;border-radius:14px;width:min(540px,calc(100vw - 32px));max-height:85vh;padding:28px;box-shadow:0 20px 80px #102b4855;color:#19283b}.required-dialog::backdrop{background:#102b48aa;backdrop-filter:blur(3px)}.required-dialog h2{font-size:21px}.required-dialog p{font-size:13px;color:#65778d}.required-dialog #required-inputs>div{margin:18px 0}.required-dialog textarea{display:block}.required-dialog .primary{width:100%;margin-top:8px}.unknown-button{background:#edf3fb;color:#396594;font-size:11px;padding:7px 10px;margin-top:6px}.required-dialog #required-error{color:#b34835;font-size:12px}.required-badge{font-size:9px;color:#b34835;font-weight:600;margin-right:4px}
 
 .evidence{padding:12px 15px;background:#f1f6fd;border-radius:8px;margin-bottom:20px;color:#45678d;font-size:12px}.evidence summary{cursor:pointer;font-weight:600}.evidence p{white-space:pre-wrap;border-bottom:1px solid #d8e4f3;padding-bottom:12px;overflow-wrap:anywhere}
+
+.access-input{display:block;width:100%;padding:12px;border:1px solid #c8d9ed;border-radius:7px;margin:10px 0 16px;font:inherit}

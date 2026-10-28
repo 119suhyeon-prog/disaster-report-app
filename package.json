@@ -5,10 +5,14 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "check:deploy": "node scripts/check-deployment.mjs"
   },
   "dependencies": {
     "jszip": "^3.10.2",
     "kordoc": "4.24.12"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }

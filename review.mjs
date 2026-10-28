@@ -1,7 +1,7 @@
 import {createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
 import {requiredFields,fields} from './report.mjs';
-const key=randomBytes(32);
-const signature=value=>createHmac('sha256',key).update(value).digest('base64url');
+const fallbackKey=randomBytes(32);
+const signature=value=>createHmac('sha256',process.env.REVIEW_SIGNING_KEY||fallbackKey).update(value).digest('base64url');
 export function issueEvidence(result){
   const values=Object.fromEntries(requiredFields.filter(k=>result.metadata[k]?.grounded&&!result.metadata[k]?.needsConfirmation).map(k=>[k,result.report[k]]));
   const payload=Buffer.from(JSON.stringify(values)).toString('base64url');return `${payload}.${signature(payload)}`;

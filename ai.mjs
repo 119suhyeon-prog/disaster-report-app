@@ -1,6 +1,7 @@
 import {lookup} from 'node:dns/promises';
 import {isIP} from 'node:net';
 import {pathToFileURL} from 'node:url';
+import {requestOpenAI} from './openai.mjs';
 import {fields,emptyReport,validateReport,extractDraft} from './report.mjs';
 
 export class AIError extends Error {constructor(code,message){super(message);this.code=code;}}
@@ -54,9 +55,10 @@ export async function validateEndpoint(value){
   return url.href;
 }
 export function aiStatus(env=process.env){
+  if(env.AI_PROVIDER==='openai')return {mode:'openai',providerLabel:'OpenAI',configured:!!env.OPENAI_API_KEY,label:env.OPENAI_API_KEY?'OpenAI 설정됨 · 실제 연결 미확인':'OpenAI API 키 미설정'};
   const demo=env.AI_PROVIDER==='rules-demo';
   const configured=env.AI_PROVIDER==='onai'&&!!env.ONAI_BASE_URL&&!!env.ONAI_MODEL&&(env.ONAI_PROTOCOL==='json-contract-v1'||!!env.ONAI_ADAPTER_PATH);
-  return {mode:demo?'rules-demo':'onai',configured:demo||configured,label:demo?'규칙 기반 데모 · AI 미연결':configured?'온AI 설정됨 · 실제 연결 미확인':'온AI 연결 미설정'};
+  return {mode:demo?'rules-demo':'onai',providerLabel:demo?'데모':'온AI',configured:demo||configured,label:demo?'규칙 기반 데모 · AI 미연결':configured?'온AI 설정됨 · 실제 연결 미확인':'온AI 연결 미설정'};
 }
 export async function createDraft(text,currentReport={},options={}){
   const env=options.env||process.env;
@@ -64,6 +66,14 @@ export async function createDraft(text,currentReport={},options={}){
   const current=validateReport(currentReport);
   if(env.AI_PROVIDER==='rules-demo'){
     const result=extractDraft(text);return {...result,mode:'rules-demo',metadata:Object.fromEntries(Object.entries(result.report).filter(([,v])=>v).map(([key])=>[key,{source:result.sources[key],status:'미확인',actionState:'해당 없음',grounded:true,needsConfirmation:false,origin:'rules-demo'}]))};
+  }
+  if(env.AI_PROVIDER==='openai'){
+    if(!env.OPENAI_API_KEY)throw new AIError('NOT_CONFIGURED','OpenAI API 키 미설정: 서버 환경변수 OPENAI_API_KEY를 설정해 주세요.');
+    const administrative=new Set(['number','recipient','issuedAt','receivedAt','department','author','contact']);
+    const related=Object.fromEntries(Object.entries(current).filter(([key,value])=>value&&!administrative.has(key)));
+    const raw=await requestOpenAI({instructions,input:{text,currentReport:related,referenceTime:(options.now||new Date()).toISOString(),timeZone:'Asia/Seoul'},outputSchema},env,options.fetch||fetch);
+    let result;try{result=validateAIOutput(raw,text,current);}catch{throw new AIError('INVALID_RESPONSE','OpenAI 응답의 형식 또는 입력 근거가 올바르지 않습니다. 기존 초안을 유지했습니다.');}
+    result.mode='openai';for(const meta of Object.values(result.metadata))meta.origin='openai';return result;
   }
   if(!aiStatus(env).configured)throw new AIError('NOT_CONFIGURED','온AI 연결 미설정: 전산 담당자의 API 규격을 받아 서버 환경변수를 설정해 주세요.');
   const endpoint=await validateEndpoint(env.ONAI_BASE_URL);

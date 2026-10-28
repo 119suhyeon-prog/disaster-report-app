@@ -1,0 +1,26 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "node scripts/check-deployment.mjs",
+  "installCommand": "npm ci --omit=optional --ignore-scripts",
+  "outputDirectory": "public",
+  "functions": {
+    "api/index.mjs": {
+      "maxDuration": 60,
+      "includeFiles": "templates/**",
+      "excludeFiles": "{artifacts/**,test/**,.git/**,.env*,node_modules/onnxruntime*/**,node_modules/@huggingface/**,node_modules/@img/**,node_modules/@hyzyla/**,node_modules/sharp/**,node_modules/pdfjs-dist/**}"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/schema", "destination": "/api/index?__route=schema" },
+    { "source": "/api/draft", "destination": "/api/index?__route=draft" },
+    { "source": "/api/export", "destination": "/api/index?__route=export" },
+    { "source": "/api/health", "destination": "/api/index?__route=health" }
+  ],
+  "headers": [{ "source": "/(.*)", "headers": [
+    { "key": "X-Content-Type-Options", "value": "nosniff" },
+    { "key": "Referrer-Policy", "value": "no-referrer" },
+    { "key": "Cache-Control", "value": "no-store" },
+    { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'" }
+  ]}]
+}
