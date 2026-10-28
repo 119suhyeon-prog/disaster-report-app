@@ -18,7 +18,7 @@ export function resolveJurisdiction(text){
   return {province,observed,ambiguous:!province&&observed.length>0,lookup:explicit.size===0};
 }
 export function extractPersonnel(text){
-  const groups=new Map(),pattern=/(의용소방대(?:원)?|소방(?:대원|공무원|인력|인원|관)?|경찰(?:관|인력)?|해양경찰(?:관)?|해경|공무원|군인|군\s*병력)\s*(?:인력\s*)?(?:총\s*|누계\s*)?(약\s*)?([\d,]+)\s*명/g;
+  const groups=new Map(),pattern=/(의용소방대(?:원)?|소방(?:대원|공무원|인력|인원|관|차)?|경찰(?:관|인력|차)?|해양경찰(?:관)?|해경|공무원|군인|군\s*병력)\s*(?:인력\s*)?(?:총\s*|누계\s*)?(?:[\d,]+\s*대\s*)?(약\s*)?([\d,]+)\s*명/g;
   for(const match of text.matchAll(pattern)){
     const after=text.slice(match.index+match[0].length,match.index+match[0].length+15);
     if(/^\s*(?:이|가|은|는|의)?\s*(?:부상|사망|실종|대피|구조됨|구조됐|이송|대기|출동\s*예정|동원\s*예정)/.test(after))continue;

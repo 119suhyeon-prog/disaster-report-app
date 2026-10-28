@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createDraft,validateAIOutput,aiStatus,validateEndpoint,instructions} from '../ai.mjs';
+import {createDraft,validateAIOutput,aiStatus,validateEndpoint,instructions,outputSchema} from '../ai.mjs';
 import {issueEvidence,requireReviewed} from '../review.mjs';
 import {mergeDraft} from '../public/merge.js';
 import {exportReport} from '../export.mjs';
@@ -54,6 +54,25 @@ test('검증 실패는 해당 항목과 원인을 알리되 원문·응답 값�
   assert.throws(()=>validateAIOutput(raw,text),error=>error.code==='INVALID_RESPONSE'&&error.message.includes('사고개요')&&error.message.includes('근거 문장')&&!error.message.includes('민감 원문'));
   const count=fixture();count.fields.evacuation.value='20명 대피 완료.';
   assert.throws(()=>validateAIOutput(count,text),error=>error.message.includes('인명대피')&&error.message.includes('숫자')&&!error.message.includes('20명'));
+});
+
+test('모델이 추측한 시행·접수·담당자 정보 때문에 정상 본문을 거절하지 않고 그 값은 버린다',()=>{
+  const raw=fixture();raw.fields.issuedAt=item('2099. 12. 31. 00:00','2025년 1월 1일 10시');raw.fields.receivedAt=item('2099. 12. 31. 00:00','2025년 1월 1일 10시');raw.fields.author=item('만든 이름','없는 근거');
+  const result=validateAIOutput(raw,text);assert.equal(result.report.issuedAt,'');assert.equal(result.report.receivedAt,'');assert.equal(result.report.author,'');assert.match(result.report.overview,/천장 낙하/);assert.equal(result.metadata.receivedAt,undefined);
+  for(const key of ['title','recipient','issuedAt','receivedAt','author','contact'])assert.equal(outputSchema.properties.fields.properties[key],undefined);
+});
+
+test('직접 적은 기본정보는 서버에서 그대로 반영하고 AI 요청 본문에서 제외한다',async()=>{
+  let sent;const input=text+'\n접수일시: 2026. 10. 28. 14:00\n담당자: 가상담당\n연락처: 010-0000-0000';
+  const result=await createDraft(input,{}, {env,fetch:async(_url,options)=>{sent=JSON.parse(options.body);return jsonResponse(fixture());}});
+  assert.equal(result.report.receivedAt,'2026. 10. 28. 14:00');assert.equal(result.report.author,'가상담당');assert.equal(result.report.contact,'010-0000-0000');assert.equal(result.metadata.author.origin,'user');
+  assert.doesNotMatch(sent.input.text,/가상담당|010-0000-0000|접수일시/);
+});
+
+test('대수와 인원이 붙은 가상 문장도 장비와 인원을 구분해 자동 정리한다',()=>{
+  const input='가상시 시험동 가상창고 화재. 소방 4대 9명, 경찰 1대 3명 출동. 소방대 진압 중.';
+  const result=validateAIOutput({fields:{overview:item('가상창고 화재 발생.','가상창고 화재'),personnel:item('소방 9명, 경찰 3명','소방 4대 9명, 경찰 1대 3명'),equipment:item('소방 4대, 경찰 1대','소방 4대 9명, 경찰 1대 3명')}},input);
+  assert.equal(result.report.personnel,'소방 9명, 경찰 3명');assert.equal(result.report.equipment,'소방 4대, 경찰 1대');
 });
 test('대피 인원을 인명피해로 전환하거나 예정 조치를 완료로 바꾸지 않는다',()=>{
   const r=fixture();r.fields.casualties=item('부상 11명','11명이 대피했고');assert.throws(()=>validateAIOutput(r,text),{code:'INVALID_RESPONSE'});
