@@ -1,5 +1,5 @@
 import {createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
-import {requiredFields,fields} from './report.mjs';
+import {requiredFields,fields,requireComplete} from './report.mjs';
 const fallbackKey=randomBytes(32);
 const signature=value=>createHmac('sha256',process.env.REVIEW_SIGNING_KEY||fallbackKey).update(value).digest('base64url');
 export function issueEvidence(result){
@@ -7,6 +7,7 @@ export function issueEvidence(result){
   const payload=Buffer.from(JSON.stringify(values)).toString('base64url');return `${payload}.${signature(payload)}`;
 }
 export function requireReviewed(report,tokens=[],confirmed=[]){
+  requireComplete(report);
   if(!Array.isArray(tokens)||tokens.length>100||!Array.isArray(confirmed)||confirmed.some(k=>!requiredFields.includes(k)))throw Error('필수 정보 확인 상태가 올바르지 않습니다.');
   const supported=new Set(confirmed);
   for(const token of tokens){

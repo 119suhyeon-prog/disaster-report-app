@@ -56,9 +56,9 @@ test('신고 없음과 피해 없음의 차이를 검증한다',()=>{
   assert.throws(()=>validateAIOutput({fields:{casualties:item('인명피해 없음','현재까지 인명피해 신고 없음')}},'현재까지 인명피해 신고 없음'),{code:'INVALID_RESPONSE'});
 });
 test('명시한 확인 중은 근거로 인정하고 자동 확인 중은 사용자 확인이 필요하다',()=>{
-  const r=validateAIOutput(fixture(),text);const token=issueEvidence(r);
-  assert.throws(()=>requireReviewed(r.report,[token]),/인명피해/);
-  assert.doesNotThrow(()=>requireReviewed(r.report,[token],['casualties']));
+  const r=validateAIOutput(fixture(),text);Object.assign(r.report,{receivedAt:'2026. 10. 28. 11:30',author:'가상 담당자',contact:'010-0000-0000'});const token=issueEvidence(r);
+  assert.throws(()=>requireReviewed(r.report,[token],['receivedAt','author','contact']),/인명피해/);
+  assert.doesNotThrow(()=>requireReviewed(r.report,[token],['receivedAt','author','contact','casualties']));
   const explicit=validateAIOutput({fields:{casualties:item('확인 중','인명피해 확인 중','미확인')}},'인명피해 확인 중');assert.equal(explicit.metadata.casualties.needsConfirmation,false);
   assert.throws(()=>requireReviewed(r.report,['forged.token'],[]),/필수 정보/);
 });
@@ -87,7 +87,7 @@ test('필요한 사건 정보만 보내고 행정 메타데이터는 전송하�
   assert.equal(sent.input.currentReport.location,'기존 장소');assert.equal(sent.input.currentReport.contact,undefined);assert.equal(sent.input.currentReport.author,undefined);
 });
 test('모의 AI 변환 결과를 기존 HWPX 위치에 반영한다',async()=>{
-  const result=validateAIOutput(fixture(),text);result.report.casualties='확인 중';
+  const result=validateAIOutput(fixture(),text);result.report.casualties='확인 중';Object.assign(result.report,{receivedAt:'2026. 10. 28. 11:30',author:'가상 담당자',contact:'010-0000-0000'});
   const parsed=await parse(await exportReport(result.report));assert.equal(parsed.success,true);
   assert.match(parsed.markdown,/인명대피: 11명 대피 완료/);assert.match(parsed.markdown,/천장 낙하 사고 발생/);
   assert.doesNotMatch(parsed.markdown,/보고서 작성필요|떨어져가지구|부상 11명/);

@@ -1,3 +1,6 @@
+import {applyReportConventions} from './report-enrichment.mjs';
+import {requiredValueValid,explicitRequiredFields} from './public/required-rules.js';
+export {explicitRequiredFields};
 export const sections = [
   ['기본정보', [['title','제목'],['number','보고번호'],['recipient','수신'],['issuedAt','시행일시'],['receivedAt','접수일시'],['department','발신부서'],['author','담당자 성명'],['contact','담당자 연락처']]],
   ['1. 발생개요', [['occurredAt','발생일시'],['location','장소'],['cause','사고원인'],['overview','사고개요']]],
@@ -9,8 +12,8 @@ export const sections = [
   ['7. 향후 전망 및 대책', [['plan','향후 전망 및 대책']]],
 ];
 export const fields = sections.flatMap(([,items])=>items);
-export const requiredFields = ['occurredAt','location','overview','casualties'];
-export const missingRequired = report => fields.filter(([key])=>requiredFields.includes(key)&&!report[key]?.trim());
+export const requiredFields = ['occurredAt','location','overview','casualties','receivedAt','author','contact'];
+export const missingRequired = report => fields.filter(([key])=>requiredFields.includes(key)&&!requiredValueValid(key,report[key]));
 export function requireComplete(report) {
   const missing=missingRequired(report);
   if(missing.length) throw Error(`필수 정보를 입력해 주세요: ${missing.map(([,label])=>label).join(', ')}`);
@@ -55,7 +58,7 @@ export function extractDraft(text) {
       }
     }
   }
-  return {report:result,sources};
+  return applyReportConventions({report:result,sources},text);
 }
 export const escapeHtml = value => value.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll('\n','<br>');
 // 원본의 표·행 구조를 유지하고 본문 셀의 내용만 교체한다.

@@ -22,9 +22,16 @@ test('HTTPS 같은 출처를 허용하고 타 출처와 미설정 AI를 차단�
   assert.equal((await request('draft',{method:'POST',body:{text:'가상 사고'},origin:'https://other.example.test'})).status,403);
   const res=await request('draft',{method:'POST',body:{text:'가상 사고'},origin:'https://test-app.example.test'});assert.equal(res.status,503);assert.equal(JSON.parse(res.data).code,'NOT_CONFIGURED');
 });
+
+test('Vercel 모드에서도 인증을 유지하며 화재 조회 기능을 제공한다',async()=>{
+  assert.equal(JSON.parse((await request('schema')).data).localFireTrial,false);
+  assert.equal(JSON.parse((await request('schema')).data).fireIncidentsEnabled,true);
+  assert.equal((await request('fire-incidents',{method:'POST',body:{mode:'mock'},authorized:false})).status,401);
+  const result=await request('fire-incidents',{method:'POST',body:{mode:'mock'}});assert.equal(result.status,200);assert.ok(JSON.parse(result.data).incidents.length>0);
+});
 test('Vercel이 파싱한 body로 필수 확인과 실제 HWPX 생성이 동작한다',async()=>{
   const {emptyReport,requiredFields}=await import('../report.mjs');
-  const report=emptyReport();for(const field of requiredFields)report[field]='확인 중';report.overview='가상 배포 시험';
+  const report=emptyReport();for(const field of requiredFields)report[field]='확인 중';report.overview='가상 배포 시험';Object.assign(report,{receivedAt:'2026. 10. 28. 11:30',author:'가상 담당자',contact:'010-0000-0000'});
   const blocked=await request('export',{method:'POST',body:{report}});assert.equal(blocked.status,400);
   const result=await request('export',{method:'POST',body:{report,confirmedFields:requiredFields},origin:'https://test-app.example.test'});
   assert.equal(result.status,200);assert.ok(Buffer.isBuffer(result.data));assert.ok(result.data.length>1000);assert.equal(result.data.subarray(0,2).toString(),'PK');
