@@ -9,6 +9,8 @@ export const instructions=`너는 재난상황보고 초안 작성기다. 입력
 입력 원문에 근거한 사실만 간결한 행정 보고 문체로 변환한다. 말버릇·반복·보고서 작성 요청은 제거한다.
 사고개요는 짧게 요약하고 전체 원문을 붙이지 않는다. 세부 조치는 해당 항목에 배치한다.
 천장 낙하는 건물 전체 붕괴가 아니다. 사고 현상과 원인을 구분한다.
+사고원인에는 사고명·현상을 반복하지 않는다. 원인에 대한 명시적 설명(원인, 때문에 등)이 없으면 확인 중으로 두며, 원인 근거에는 해당 설명까지 포함한다.
+발생일시는 가능한 경우 YYYY. M. D. HH:mm 형식의 한국어 보고용 표기로 쓴다. 사고개요는 간결한 '… 사고 발생.' 문체로 쓴다.
 대피·구조·사망·실종·부상 인원은 구분하며 미언급을 0명으로 바꾸지 않는다.
 피해 신고 없음과 피해 없음, 출동 지령·출동 중·현장 도착, 완료·진행 중·예정을 구분한다.
 추정·약·경·확인 중을 유지하고 없는 원인·기관·주소·병원·시각·인원을 만들지 않는다.
@@ -41,6 +43,10 @@ export function validateAIOutput(raw,text,currentReport={}){
     if(item.actionState==='완료'&&/예정|계획|출동\s*중|이송\s*중/.test(source))throw invalid();
     report[key]=value;
     metadata[key]={source,status:item.status,actionState:item.actionState,grounded:!!source,needsConfirmation:!source||item.status==='상충',origin:'onai'};
+    // 사고 현상을 원인으로 오분류한 실응답을 방어한다. 원인 단서가 없으면 보수적으로 미확인 처리한다.
+    if(key==='cause'&&value&&value!=='확인 중'&&!/원인|때문|탓|(?:으)?로\s*인(?:해|한|하여)/.test(source)&&source!==currentReport.cause){
+      report[key]='확인 중';metadata[key]={source:'',status:'미확인',actionState:'해당 없음',grounded:false,needsConfirmation:true,origin:'onai'};
+    }
   }
   validateReport(report);
   return {report,metadata,dateInterpretation:raw.dateInterpretation||'',mode:'onai'};

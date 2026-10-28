@@ -18,6 +18,11 @@ const fixture=()=>({fields:{
 }});
 const env={AI_PROVIDER:'onai',ONAI_BASE_URL:'http://127.0.0.1:9999/private-ai',ONAI_MODEL:'test-model',ONAI_PROTOCOL:'json-contract-v1',ONAI_API_KEY:'test-only-key'};
 const jsonResponse=value=>new Response(JSON.stringify(value),{headers:{'content-type':'application/json'}});
+test('천장 낙하 현상을 사고원인으로 분류한 실응답 유형을 보정한다',()=>{
+  const raw=fixture();raw.fields.cause=item('시험건물 천장 낙하','천장이 떨어져가지구');
+  const result=validateAIOutput(raw,text);assert.equal(result.report.cause,'확인 중');assert.equal(result.metadata.cause.grounded,false);
+  const explicit=validateAIOutput({fields:{cause:item('노후화 추정','원인은 노후화로 추정','추정')}},'원인은 노후화로 추정');assert.equal(explicit.report.cause,'노후화 추정');
+});
 test('명시적으로 선택한 계약 어댑터의 요청·응답과 기준시각을 모의 검증한다',async()=>{
   let call;
   const result=await createDraft(text,{}, {env,now:new Date('2026-10-27T01:00:00Z'),fetch:async(url,options)=>{call={url,options};return jsonResponse(fixture());}});
