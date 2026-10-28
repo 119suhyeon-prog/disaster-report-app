@@ -8,12 +8,12 @@ let firePanel;
 function applyFireInformation(incident,plans,context){
   let count=0;
   for(const plan of plans){
-    const info={...(plan.key==='timeline'?{fireImports:{...(metadata.timeline?.fireImports||{}),[incident.id]:plan.importLines||[]}}:{}),source:`${context.source}\n${incident.name} (${incident.id})\n사건별 갱신 ${incident.updatedAt||'미제공'}\n자료 기준 ${incident.dataAsOf||'미제공'}\n조회 ${context.fetchedAt}\n선택 ${context.selectedAt}\n원본 시각 ${JSON.stringify({times:incident.times,sourceTime:incident.sourceTime})}\n${plan.value}`,status:'미확인',actionState:'해당 없음',grounded:true,needsConfirmation:false,origin:'fire',record:{id:incident.id,times:incident.times,sourceTime:incident.sourceTime,dataAsOf:incident.dataAsOf,updatedAt:incident.updatedAt,...context}};
+    const info={...(plan.key==='timeline'?{fireImports:{...(metadata.timeline?.fireImports||{}),[incident.id]:plan.importLines||[]}}:{}),source:`${context.source}\n${incident.name} (${incident.id})\n사건별 갱신 ${incident.updatedAt||'미제공'}\n자료 기준 ${incident.dataAsOf||'미제공'}\n조회 ${context.fetchedAt}\n선택 ${context.selectedAt}\n원본 시각 ${JSON.stringify({times:incident.times,sourceTime:incident.sourceTime})}\n${plan.value}`,status:plan.inferred?'추정':'미확인',actionState:'해당 없음',grounded:true,needsConfirmation:false,origin:'fire',record:{id:incident.id,times:incident.times,sourceTime:incident.sourceTime,dataAsOf:incident.dataAsOf,updatedAt:incident.updatedAt,...context}};
     if(report[plan.key]||manual.has(plan.key)){pending=pending.filter(item=>item.key!==plan.key);pending.push({key:plan.key,value:plan.value,metadata:info});}
     else{report[plan.key]=plan.value;metadata[plan.key]=info;if(schema.requiredFields.includes(plan.key))confirmed.add(plan.key);count++;}
   }
   refresh();renderConflicts();$('#report-status').textContent=`화재현황에서 ${count}개 항목 반영 · 변경 후보 ${pending.length}건`;
-  toast(pending.length?'기존 값과 비교할 변경 후보가 있습니다. 보고서에서 적용 여부를 선택하세요.':'선택한 시각을 반영했습니다. 나머지 필수 정보도 확인해 주세요.');
+  toast(pending.length?'기존 값과 비교할 변경 후보가 있습니다. 보고서에서 적용 여부를 선택하세요.':'선택한 발생일시와 장소를 반영했습니다. 나머지 필수 정보도 확인해 주세요.');
 }
 function markManual(key){manual.add(key);if(report[key]?.trim())confirmed.add(key);else confirmed.delete(key);metadata[key]={source:report[key],status:'미확인',actionState:'해당 없음',grounded:true,needsConfirmation:false,origin:'user'};}
 function updateAIStatus(label){$('#ai-status').textContent=label;$('.demo-tag').textContent=label;}

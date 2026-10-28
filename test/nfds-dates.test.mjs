@@ -26,7 +26,7 @@ const payload=()=>({nowDate:'2026-10-27 23:59:59',defail:['10:00','00:01','23:59
 test('원문·추정 기준을 보관하고 날짜를 포함한 참고 내역을 반영하며 수동 값은 유지한다',()=>{
   const result=validateIncidents(normalizeNfdsPayload(payload(),{now}));assert.equal(result[0].dataAsOf,'2026-10-27 23:59:59');assert.equal(result[0].sourceTime.dateInference.anchorDate,'2026-10-28');
   const report={occurredAt:'담당자 확인값',receivedAt:'상황실 접수값',timeline:'직접 작성'};const plan=buildFirePlan(result[2],report);
-  assert.equal(plan.length,1);assert.equal(plan[0].key,'timeline');assert.match(plan[0].value,/2026-10-27 23:59/);assert.doesNotMatch(plan[0].value,/날짜 추정|NFDS 표시|D-1/);assert.match(plan[0].value,/직접 작성/);assert.equal(report.occurredAt,'담당자 확인값');
+  assert.equal(plan.length,2);assert.equal(plan[0].key,'occurredAt');assert.equal(plan[0].value,'2026-10-27 23:59 (추정)');assert.equal(plan[0].previous,'담당자 확인값');assert.equal(plan[1].key,'location');assert.equal(report.timeline,'직접 작성');assert.equal(report.occurredAt,'담당자 확인값');
   const invalid=structuredClone(result);invalid[0].sourceTime.dateInference.dayOffset=5;assert.throws(()=>validateIncidents(invalid),{code:'FIRE_INVALID'});
 });
 test('지역 검색도 전국 목록에서 추정하고 캐시가 자정을 넘으면 새 기준으로 재조회한다',async()=>{

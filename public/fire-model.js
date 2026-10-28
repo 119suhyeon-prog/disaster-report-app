@@ -7,13 +7,17 @@ export function formatNfdsTime(time){const inferred=time?.dateInference;return i
 export function buildFirePlan(incident,current,imports={}){
   const proposed={};
   if(incident.times.occurredAt)proposed.occurredAt=formatFireTime(incident.times.occurredAt);
+  const nfds=incident.id.startsWith('nfds:')&&!incident.mock;
+  const inferred=nfds&&!incident.times.occurredAt&&!!incident.sourceTime?.dateInference;
+  if(inferred)proposed.occurredAt=`${incident.sourceTime.dateInference.date} ${incident.sourceTime.raw} (추정)`;
+  if(nfds&&incident.address?.trim()&&incident.address!=='주소 미제공')proposed.location=incident.address;
   const tag=`[${incident.mock?'가상 사건':'출처 자료'}: ${incident.name} / ${incident.id}]`;
   const entries=Object.entries(timeLabels).filter(([key])=>incident.times[key]);
   const lines=entries.map(([key,label])=>`${formatFireTime(incident.times[key])} ${label}`);
-  if(incident.sourceTime)lines.push(`${incident.sourceTime.dateInference?incident.sourceTime.dateInference.date+' ':''}${incident.sourceTime.raw}`);
+  if(incident.sourceTime&&!nfds)lines.push(`${incident.sourceTime.dateInference?incident.sourceTime.dateInference.date+' ':''}${incident.sourceTime.raw}`);
   // 같은 사건·단계의 이전 가져오기 문장만 교체 후보로 만든다. 직접 작성한 줄은 보존한다.
   const retained=(current.timeline||'').split('\n').filter(line=>!entries.some(([,label])=>line.endsWith(` ${label} ${tag}`))&&!(incident.sourceTime&&nfdsTimeLabels.some(label=>line.endsWith(` ${label} ${tag}`)))&&!(imports[incident.id]||[]).includes(line));
   const clean=line=>line.replace(/\s*\[(?:가상 사건|출처 자료):[^\]\n]*\]\s*$/,'').replace(/\s*\(D-(?:day|\d+)\)\s*/g,' ').replace(/\s*NFDS 표시 일시 \((?:날짜·종류 미확인|날짜 추정·종류 미확인)\)/g,'').trim();
   if(lines.length)proposed.timeline=[...new Set([...retained.map(clean),...lines].filter(Boolean))].join('\n');
-  return Object.entries(proposed).map(([key,value])=>({key,value,previous:current[key]||'',label:key==='occurredAt'?'발생일시':'시간대별 조치사항',changed:(current[key]||'')!==value,...(key==='timeline'?{importLines:lines}:{})}));
+  return Object.entries(proposed).map(([key,value])=>({key,value,previous:current[key]||'',label:({occurredAt:'발생일시',location:'장소',timeline:'시간대별 조치사항'})[key],inferred:key==='occurredAt'&&inferred,changed:(current[key]||'')!==value,...(key==='timeline'?{importLines:lines}:{})}));
 }

@@ -11,10 +11,12 @@ test('NFDS는 map을 사건 상세로 오인하지 않고 defail을 정규화한
   const rows=validateIncidents(normalizeNfdsPayload(fixture()));assert.equal(rows.length,1);assert.equal(rows[0].station,'가상소방서');assert.equal(rows[0].mock,false);assert.equal(rows[0].updatedAt,null);assert.equal(rows[0].sourceTime.raw,'11:12');
   assert.deepEqual(rows[0].times,{});assert.equal(rows[0].dataAsOf,'2026-10-28 11:12:38');assert.equal(rows[0].casualties,undefined);
 });
-test('NFDS 추정 날짜를 참고에 붙이되 발생·119 신고·상황실 접수시각은 바꾸지 않는다',()=>{
-  const event=normalizeNfdsPayload(fixture())[0],report={occurredAt:'직접 확인한 발생일시',receivedAt:'상황실 접수시각',timeline:'직접 작성'};
-  const plan=buildFirePlan(event,report);assert.deepEqual(plan.map(x=>x.key),['timeline']);assert.match(plan[0].value,/\d{4}-\d{2}-\d{2} 11:12/);assert.doesNotMatch(plan[0].value,/D-day|NFDS 표시|nfds:/);assert.doesNotMatch(plan[0].value,/신고접수시각|출동시각/);assert.equal(report.occurredAt,'직접 확인한 발생일시');
+test('NFDS 발생일시와 장소 제안은 기존 수동 값을 보존한다',()=>{
+ const event=normalizeNfdsPayload(fixture())[0], report={occurredAt:'담당자 확인값',location:'기존 장소',receivedAt:'접수값',timeline:'직접 작성'};
+ const plans=buildFirePlan(event,report);assert.deepEqual(plans.map(p=>p.key),['occurredAt','location']);assert.ok(plans[0].value.endsWith('11:12 (추정)'));assert.equal(plans[0].inferred,true);assert.equal(plans[0].previous,'담당자 확인값');assert.equal(plans[1].value,'가상시 시험동 1번지');assert.equal(plans[1].previous,'기존 장소');assert.equal(report.timeline,'직접 작성');assert.equal(report.receivedAt,'접수값');
+ delete event.sourceTime.dateInference;event.address='주소 미제공';assert.deepEqual(buildFirePlan(event,report),[]);
 });
+
 test('확인된 잔불정리·감시 표시, 빈 관할, 미제공 시각을 처리한다',()=>{
   const input=fixture();Object.assign(input.defail[0],{progressStat:'H',progressNm:undefined,cntrNm:null,overDate:null});
   const row=validateIncidents(normalizeNfdsPayload(input))[0];assert.equal(row.status,'잔불감시');assert.equal(row.sourceTime,undefined);assert.match(row.station,/미제공/);
