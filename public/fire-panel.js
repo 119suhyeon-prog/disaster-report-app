@@ -1,9 +1,9 @@
 import {timeLabels,formatFireTime,buildFirePlan,nfdsRegions} from './fire-model.js';
 const el=(tag,text,className)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(className)node.className=className;return node;};
-export function initFirePanel({api,getReport,getMemo,apply,toast,getImports=()=>({})}){
+export function initFirePanel({api,getReport,getMemo,apply,toast,getImports=()=>({}),initialMode='mock',autoLoad=false}){
   let rows=[],selection=null,fetchedAt='',mode='mock',fetching=false,selectionHistory=[],lastRequest=0,requestVersion=0,visibleLimit=8,reportCreatedAt=new Date().toISOString();
-  const panel=el('section',undefined,'panel fire-panel');panel.setAttribute('aria-label','화재출동현황 로컬 시험');
-  panel.innerHTML=`<div class="fire-heading"><div><span class="eyebrow">LOCAL FIRE DISPATCH TRIAL</span><h2>화재출동현황 · 사건 시각 가져오기</h2><p id="fire-connection">가상 데이터 데모</p></div><button type="button" class="secondary" id="fire-toggle" aria-expanded="true">화재출동현황 조회 접기</button></div>
+  const panel=el('section',undefined,'panel fire-panel');panel.setAttribute('aria-label','화재출동현황');
+  panel.innerHTML=`<div class="fire-heading"><div><span class="eyebrow">FIRE DISPATCH STATUS</span><h2>화재출동현황 · 사건 시각 가져오기</h2><p id="fire-connection">가상 데이터 데모</p></div><button type="button" class="secondary" id="fire-toggle" aria-expanded="true">화재출동현황 조회 접기</button></div>
   <div id="fire-body"><div class="fire-notice" id="fire-notice" hidden>발생·119 신고접수·출동·도착은 서로 다른 시각입니다. 사건을 직접 선택한 뒤 반영하세요. 가상 자료 기준일: 2026. 10. 28.</div>
   <form id="fire-search" class="fire-filters"><label>데이터 연결<select name="mode"><option value="mock">가상 데이터 데모</option><option value="nfds">NFDS 실제 조회</option><option value="official">공식 API (미설정)</option></select></label><label>시험 시나리오<select name="scenario"><option value="normal">기본 가상 사건</option><option value="revised">한빛창고 발생시각 정정</option><option value="empty">검색 결과 없음</option><option value="failure">연결 실패 시험</option></select></label><label>지역<select name="region"><option value="">전체 가상 지역</option><option value="가상시">가상시</option></select></label><label>시작 일시 (한국시간)<input type="datetime-local" name="from" value="2026-10-27T00:00"></label><label>종료 일시 (한국시간)<input type="datetime-local" name="to" value="2026-10-28T23:59"></label><label>주소·건물·사건명<input name="keyword" maxlength="200" placeholder="예: 한빛창고, 가상동"></label><div class="fire-search-actions"><button type="submit" class="primary">조회 / 수동 새로고침</button><button type="button" class="secondary" id="fire-memo">상황 메모에서 관련 사건 찾기</button><button type="button" class="secondary" id="fire-sample">가상 메모 입력</button></div></form>
   <p id="fire-status" class="fire-status" role="status">가상 데이터 데모 · 조회 버튼을 누르면 가상 후보가 표시됩니다. 자동 조회하지 않습니다.</p>
@@ -74,5 +74,7 @@ export function initFirePanel({api,getReport,getMemo,apply,toast,getImports=()=>
   };
   form.onsubmit=event=>{event.preventDefault();search();};$('#fire-memo').onclick=()=>search(true);
   $('#fire-sample').onclick=()=>{document.querySelector('#situation').value='2026년 10월 28일 가상시 가상동 123번지 한빛창고에서 화재 발생. 인명피해 확인 중.';toast('가상 상황 메모를 입력했습니다. 관련 사건 찾기를 눌러 주세요.');};
+  form.elements.mode.value=initialMode;form.elements.mode.onchange();
+  if(autoLoad&&initialMode==='nfds')void search();
   return {reset(){requestVersion++;reportCreatedAt=new Date().toISOString();showStarted();rows=[];selection=null;selectionHistory=[];$('#fire-results').replaceChildren();$('#fire-detail').textContent='후보를 조회하고 사건을 선택해 주세요.';$('#fire-count').textContent='0건';$('#fire-history').replaceChildren();state('새 보고서 · 선택한 연결 모드에서 다시 조회해 주세요.');}};
 }
