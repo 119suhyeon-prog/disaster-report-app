@@ -5,7 +5,7 @@ import {existsSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {createDraft,aiStatus} from './ai.mjs';
 import {issueEvidence,requireReviewed} from './review.mjs';
-import {deploymentConfig,validAccess} from './access.mjs';
+import {deploymentConfig} from './access.mjs';
 import {createFireService} from './fire-incidents.mjs';
 import {sections,fields,sample,extractDraft,requiredFields,explicitRequiredFields} from './report.mjs';
 process.env.KORDOC_OFFLINE='1';
@@ -35,7 +35,6 @@ export async function handler(req,res){
   try {
     const path=new URL(req.url,`http://${req.headers.host}`).pathname;
     if(path==='/api/health'&&req.method==='GET'){json(res,200,{ok:true});return;}
-    if(path.startsWith('/api/')&&!validAccess(req.headers.authorization)){json(res,401,{code:'ACCESS_REQUIRED',error:'테스트 접속 코드를 입력해 주세요.'});return;}
     const fireStatic={'/fire-panel.js':['fire-panel.js','text/javascript; charset=utf-8'],'/fire-model.js':['fire-model.js','text/javascript; charset=utf-8']};
     const staticFile=staticFiles[path]||(fireIncidentsEnabled?fireStatic[path]:undefined);
     if(req.method==='GET'&&staticFile){const [name,type]=staticFile;res.writeHead(200,{'Content-Type':type});res.end(await readFile(fileURLToPath(new URL(`./public/${name}`,import.meta.url))));return;}

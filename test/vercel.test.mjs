@@ -12,22 +12,21 @@ async function request(route,{method='GET',authorized=true,body,origin,host='tes
   const res={headers:{},status:200,setHeader(k,v){this.headers[k]=v;},writeHead(status,headers={}){this.status=status;Object.assign(this.headers,headers);},end(data){this.data=data;}};
   await handler(req,res);return res;
 }
-test('Vercel rewrite·인증·공개 health·허용 도메인을 검증한다',async()=>{
+test('Vercel 공개 접속·health·허용 도메인을 검증한다',async()=>{
   assert.equal((await request('health',{authorized:false})).status,200);
-  assert.equal((await request('schema',{authorized:false})).status,401);
+  assert.equal((await request('schema',{authorized:false})).status,200);
   const schema=await request('schema');assert.equal(schema.status,200);assert.equal(JSON.parse(schema.data).ai.mode,'openai');assert.doesNotMatch(schema.data,/local-test-access|local-test-signing/);
   assert.equal((await request('schema',{host:'evil.example.test'})).status,403);
 });
 test('HTTPS 같은 출처를 허용하고 타 출처와 미설정 AI를 차단한다',async()=>{
   assert.equal((await request('draft',{method:'POST',body:{text:'가상 사고'},origin:'https://other.example.test'})).status,403);
-  const res=await request('draft',{method:'POST',body:{text:'가상 사고'},origin:'https://test-app.example.test'});assert.equal(res.status,503);assert.equal(JSON.parse(res.data).code,'NOT_CONFIGURED');
+  const res=await request('draft',{method:'POST',body:{text:'가상 사고'},origin:'https://test-app.example.test',authorized:false});assert.equal(res.status,503);assert.equal(JSON.parse(res.data).code,'NOT_CONFIGURED');
 });
 
-test('Vercel 모드에서도 인증을 유지하며 화재 조회 기능을 제공한다',async()=>{
+test('Vercel 모드에서 접속 코드 없이 화재 조회 기능을 제공한다',async()=>{
   assert.equal(JSON.parse((await request('schema')).data).localFireTrial,false);
   assert.equal(JSON.parse((await request('schema')).data).fireIncidentsEnabled,true);
-  assert.equal((await request('fire-incidents',{method:'POST',body:{mode:'mock'},authorized:false})).status,401);
-  const result=await request('fire-incidents',{method:'POST',body:{mode:'mock'}});assert.equal(result.status,200);assert.ok(JSON.parse(result.data).incidents.length>0);
+  const result=await request('fire-incidents',{method:'POST',body:{mode:'mock'},authorized:false});assert.equal(result.status,200);assert.ok(JSON.parse(result.data).incidents.length>0);
 });
 test('Vercel이 파싱한 body로 필수 확인과 실제 HWPX 생성이 동작한다',async()=>{
   const {emptyReport,requiredFields}=await import('../report.mjs');
