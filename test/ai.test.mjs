@@ -48,6 +48,13 @@ test('잘못된 JSON·항목·자료형·원문에 없는 근거와 숫자를 �
   for(const mutate of [r=>r.extra=true,r=>r.fields.unknown=item('값',''),r=>r.fields.overview.value=2,r=>r.fields.overview.source='없는 근거',r=>r.fields.evacuation.value='20명 대피 완료.']){const r=fixture();mutate(r);assert.throws(()=>validateAIOutput(r,text),{code:'INVALID_RESPONSE'});}
   await assert.rejects(createDraft(text,{}, {env,fetch:async()=>new Response('{broken')}),{code:'INVALID_RESPONSE'});
 });
+
+test('검증 실패는 해당 항목과 원인을 알리되 원문·응답 값을 오류에 노출하지 않는다',()=>{
+  const raw=fixture();raw.fields.overview.source='존재하지 않는 민감 원문';
+  assert.throws(()=>validateAIOutput(raw,text),error=>error.code==='INVALID_RESPONSE'&&error.message.includes('사고개요')&&error.message.includes('근거 문장')&&!error.message.includes('민감 원문'));
+  const count=fixture();count.fields.evacuation.value='20명 대피 완료.';
+  assert.throws(()=>validateAIOutput(count,text),error=>error.message.includes('인명대피')&&error.message.includes('숫자')&&!error.message.includes('20명'));
+});
 test('대피 인원을 인명피해로 전환하거나 예정 조치를 완료로 바꾸지 않는다',()=>{
   const r=fixture();r.fields.casualties=item('부상 11명','11명이 대피했고');assert.throws(()=>validateAIOutput(r,text),{code:'INVALID_RESPONSE'});
   assert.throws(()=>validateAIOutput({fields:{dispatch:item('현장 도착 완료','현장 출동 예정','확인','완료')}},'현장 출동 예정'),{code:'INVALID_RESPONSE'});

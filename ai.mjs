@@ -23,7 +23,7 @@ source는 input.text 또는 input.currentReport 값에 실제 존재하는 원�
 미언급 항목은 생략하거나 value=확인 중, source=빈문자열, status=미확인으로 반환한다.
 응답은 outputSchema에 맞는 JSON 객체만 반환한다. 추천 대응방안을 실제 조치에 넣지 않는다.`;
 export const outputSchema={type:'object',additionalProperties:false,required:['fields'],properties:{fields:{type:'object',additionalProperties:false,properties:Object.fromEntries(fields.map(([key])=>[key,{type:'object',additionalProperties:false,required:['value','source','status','actionState'],properties:{value:{type:'string',maxLength:1500},source:{type:'string',maxLength:12000},status:{enum:['확인','미확인','추정','상충']},actionState:{enum:['완료','진행 중','예정','해당 없음']}}}]))},dateInterpretation:{type:'string',maxLength:500}}};
-const invalid=()=>new AIError('INVALID_RESPONSE','온AI 응답 형식 또는 입력 근거가 올바르지 않습니다. 기존 초안을 유지했습니다.');
+const invalid=(key='',reason='응답 형식이 올바르지 않습니다')=>new AIError('INVALID_RESPONSE',`${fields.find(([field])=>field===key)?.[1]||'AI 응답'}: ${reason}. 기존 초안을 유지했습니다.`);
 function exactKeys(obj,allowed){return obj&&typeof obj==='object'&&!Array.isArray(obj)&&Object.keys(obj).every(key=>allowed.includes(key));}
 export function validateAIOutput(raw,text,currentReport={}){
   if(typeof raw==='string'){if(raw.length>80000)throw invalid();try{raw=JSON.parse(raw);}catch{throw invalid();}}
@@ -34,15 +34,15 @@ export function validateAIOutput(raw,text,currentReport={}){
   for(const [key,item]of Object.entries(raw.fields)){
     if(!exactKeys(item,['value','source','status','actionState'])||typeof item.value!=='string'||item.value.length>1500||typeof item.source!=='string'||item.source.length>12000||!['확인','미확인','추정','상충'].includes(item.status)||!['완료','진행 중','예정','해당 없음'].includes(item.actionState))throw invalid();
     const source=item.source.trim(),value=item.value.trim();
-    if(source&&!contexts.some(context=>context.includes(source)))throw invalid();
-    if(value&&!source&&value!=='확인 중')throw invalid();
-    if(key==='casualties'&&/\d/.test(value)&&!/인명피해|사망|실종|부상|다친|환자/.test(source))throw invalid();
-    if(key==='evacuation'&&/\d/.test(value)&&!/대피/.test(source))throw invalid();
+    if(source&&!contexts.some(context=>context.includes(source)))throw invalid(key,'입력 원문에서 근거 문장을 찾을 수 없습니다');
+    if(value&&!source&&value!=='확인 중')throw invalid(key,'작성 내용의 입력 근거가 없습니다');
+    if(key==='casualties'&&/\d/.test(value)&&!/인명피해|사망|실종|부상|다친|환자/.test(source))throw invalid(key,'피해 인원의 근거를 확인할 수 없습니다');
+    if(key==='evacuation'&&/\d/.test(value)&&!/대피/.test(source))throw invalid(key,'대피 인원의 근거를 확인할 수 없습니다');
     // 입력에 없는 숫자 생성 차단. 날짜 정규화의 00분은 발생일시에만 허용한다.
     const sourceNumbers=source.match(/\d+/g)||[];
-    if(source&&key!=='occurredAt'&&(value.match(/\d+/g)||[]).some(n=>!sourceNumbers.includes(n)))throw invalid();
-    if(/신고\s*없/.test(source)&&/피해\s*없/.test(value)&&!/신고/.test(value))throw invalid();
-    if(item.actionState==='완료'&&/예정|계획|출동\s*중|이송\s*중/.test(source))throw invalid();
+    if(source&&key!=='occurredAt'&&(value.match(/\d+/g)||[]).some(n=>!sourceNumbers.includes(n)))throw invalid(key,'입력 근거에 없는 숫자가 포함되어 있습니다');
+    if(/신고\s*없/.test(source)&&/피해\s*없/.test(value)&&!/신고/.test(value))throw invalid(key,'피해 신고 없음과 피해 없음을 구분해야 합니다');
+    if(item.actionState==='완료'&&/예정|계획|출동\s*중|이송\s*중/.test(source))throw invalid(key,'진행 또는 예정 상태가 완료로 바뀌었습니다');
     report[key]=value;
     metadata[key]={source,status:item.status,actionState:item.actionState,grounded:!!source,needsConfirmation:!source||item.status==='상충',origin:'onai'};
     // 사고 현상을 원인으로 오분류한 실응답을 방어한다. 원인 단서가 없으면 보수적으로 미확인 처리한다.
@@ -80,7 +80,7 @@ export async function createDraft(text,currentReport={},options={}){
     const administrative=new Set(['number','recipient','issuedAt','receivedAt','department','author','contact']);
     const related=Object.fromEntries(Object.entries(current).filter(([key,value])=>value&&!administrative.has(key)));
     const raw=await requestOpenAI({instructions,input:{text,currentReport:related,referenceTime:(options.now||new Date()).toISOString(),timeZone:'Asia/Seoul'},outputSchema},env,options.fetch||fetch);
-    let result;try{result=validateAIOutput(raw,text,current);}catch{throw new AIError('INVALID_RESPONSE','OpenAI 응답의 형식 또는 입력 근거가 올바르지 않습니다. 기존 초안을 유지했습니다.');}
+    let result;try{result=validateAIOutput(raw,text,current);}catch(error){if(error instanceof AIError)throw error;throw new AIError('INVALID_RESPONSE','OpenAI 응답의 형식 또는 입력 근거가 올바르지 않습니다. 기존 초안을 유지했습니다.');}
     result.mode='openai';for(const meta of Object.values(result.metadata))meta.origin='openai';return result;
   }
   if(!aiStatus(env).configured)throw new AIError('NOT_CONFIGURED','온AI 연결 미설정: 전산 담당자의 API 규격을 받아 서버 환경변수를 설정해 주세요.');

@@ -2,6 +2,7 @@ import {requiredValueValid,explicitRequiredFields} from './required-rules.js';
 import {mergeDraft} from './merge.js';
 const $=selector=>document.querySelector(selector);
 const provider=()=>schema?.ai?.providerLabel||'AI';
+const draftError=document.createElement('div');draftError.id='draft-error';draftError.className='draft-error';draftError.hidden=true;draftError.setAttribute('role','alert');$('.report-toolbar').after(draftError);
 let metadata={},confirmed=new Set(),evidenceTokens=[],requestFailed=false;
 let firePanel;
 function applyFireInformation(incident,plans,context){
@@ -77,7 +78,7 @@ $('#sample').onclick=()=>{$('#situation').value=schema.sample;$('#situation').fo
 $('#chat-form').onsubmit=async event=>{
   event.preventDefault();if(busy)return;
   const text=$('#situation').value.trim();if(!text){toast('상황 메모를 입력해 주세요.');return;}
-  busy=true;requestFailed=false;$('#generate').disabled=true;$('#download').disabled=true;$('#copy').disabled=true;$('#reset').disabled=true;$('#situation').disabled=true;$('.mode-note button').disabled=true;
+  draftError.hidden=true;draftError.textContent='';busy=true;requestFailed=false;$('#generate').disabled=true;$('#download').disabled=true;$('#copy').disabled=true;$('#reset').disabled=true;$('#situation').disabled=true;$('.mode-note button').disabled=true;
   $('#report-form').inert=true;$('#conflicts').inert=true;
   updateAIStatus(schema.ai.mode==='rules-demo'?'규칙 기반 데모 처리 중':provider()+'로 초안 작성 중');
   let success=false;
@@ -95,14 +96,14 @@ $('#chat-form').onsubmit=async event=>{
   }catch(error){
     requestFailed=true;
     updateAIStatus(error.code==='NOT_CONFIGURED'?provider()+' 연결 미설정':error.code==='INVALID_RESPONSE'?provider()+' 응답 형식 오류':error.code==='TIMEOUT'?provider()+' 응답 시간 초과':provider()+' 연결 실패');
-    toast(error.message);$('#report-status').textContent='처리 실패 · 입력 메모와 기존 초안 유지 · 다시 반영을 눌러 재시도';
+    draftError.textContent=error.message+' 입력 메모와 기존 초안은 보존되어 있습니다.';draftError.hidden=false;toast(error.message);$('#report-status').textContent='처리 실패 · 입력 메모와 기존 초안 유지 · 다시 반영을 눌러 재시도';
   }finally{
     busy=false;$('#generate').disabled=false;$('#download').disabled=false;$('#copy').disabled=false;$('#reset').disabled=false;$('#situation').disabled=false;$('.mode-note button').disabled=false;
     $('#report-form').inert=false;$('#conflicts').inert=false;
     if(success)enforceRequired();
   }
 };
-$('#reset').onclick=()=>{if(Object.values(report).some(Boolean)||history.length){if(!confirm('작성 중인 초안과 메모를 지우고 새 보고서를 시작할까요?'))return;}report=Object.fromEntries(schema.fields.map(([key])=>[key,'']));firePanel?.reset();manual.clear();confirmed.clear();metadata={};evidenceTokens=[];pending=[];history=[];requestFailed=false;updateAIStatus(schema.ai.label);$('#situation').value='';$('#messages').replaceChildren();$('#report-status').textContent='새 보고서를 시작합니다.';refresh();renderConflicts();toast('새 보고서를 시작했습니다.');};
+$('#reset').onclick=()=>{if(Object.values(report).some(Boolean)||history.length){if(!confirm('작성 중인 초안과 메모를 지우고 새 보고서를 시작할까요?'))return;}report=Object.fromEntries(schema.fields.map(([key])=>[key,'']));firePanel?.reset();draftError.hidden=true;draftError.textContent='';manual.clear();confirmed.clear();metadata={};evidenceTokens=[];pending=[];history=[];requestFailed=false;updateAIStatus(schema.ai.label);$('#situation').value='';$('#messages').replaceChildren();$('#report-status').textContent='새 보고서를 시작합니다.';refresh();renderConflicts();toast('새 보고서를 시작했습니다.');};
 $('#copy').onclick=async()=>{if(enforceRequired())return;const text=schema.sections.map(([title,items])=>`${title}\n${items.map(([key,label])=>`${label}: ${report[key]||'확인 중'}`).join('\n')}`).join('\n\n');try{await navigator.clipboard.writeText(text);toast('보고서 본문을 복사했습니다.');}catch{toast('브라우저에서 클립보드 권한을 허용해 주세요.');}};
 $('#download').onclick=async()=>{if(busy)return;if(enforceRequired())return;if(pending.length){toast('변경 후보를 모두 확인한 뒤 다운로드해 주세요.');$('#conflicts').scrollIntoView({behavior:'smooth'});return;}busy=true;const button=$('#download');button.disabled=true;button.textContent='서식에 반영 중…';try{const response=await api('/api/export',{report,evidenceTokens,confirmedFields:[...confirmed].filter(key=>schema.requiredFields.includes(key))});const blob=await response.blob();const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`재난상황보고서_${(report.title||'초안').replace(/[\\/:*?"<>|]/g,'_').slice(0,40)}.hwpx`;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);toast('HWPX 파일을 생성했습니다. 한글에서 최종 배치를 확인해 주세요.');}catch(error){toast(error.message);}finally{busy=false;button.disabled=false;button.textContent='HWPX 다운로드 ↓';}};
 try{const response=await fetch('/api/schema');if(!response.ok)throw Error('초기화 실패');schema=await response.json();setupAIStatus();report=Object.fromEntries(schema.fields.map(([key])=>[key,'']));renderFields();setupRequiredDialog();if(schema.fireIncidentsEnabled||schema.localFireTrial){const {initFirePanel}=await import('./fire-panel.js');firePanel=initFirePanel({api,getReport:()=>report,getMemo:()=>$('#situation').value,apply:applyFireInformation,toast,getImports:()=>metadata.timeline?.fireImports||{},initialMode:schema.localFireTrial?'mock':'nfds',autoLoad:!schema.localFireTrial});}}catch{toast('서버 연결을 확인한 뒤 새로고침해 주세요.');}
